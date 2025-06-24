@@ -67,10 +67,10 @@ const fractionsEqual = (f1: Fraction, f2: Fraction): boolean => {
   return s1.numerator === s2.numerator && s1.denominator === s2.denominator;
 };
 
-// Améliorer la génération de positions pour éviter les superpositions
+// Améliorer encore plus la génération de positions pour éviter les superpositions
 const generateRandomPositions = (): Array<{ top: string; left: string }> => {
   const positions: Array<{ top: string; left: string }> = [];
-  const minDistancePercent = 25; // Distance minimale de 25% pour éviter les chevauchements
+  const minDistancePercent = 35; // Augmenté à 35% pour plus d'espacement
   
   for (let i = 0; i < 4; i++) {
     let attempts = 0;
@@ -78,28 +78,29 @@ const generateRandomPositions = (): Array<{ top: string; left: string }> => {
     let isValid = false;
     
     do {
-      // Générer une position aléatoire avec des marges plus importantes
-      const top = Math.random() * 50 + 20; // Entre 20% et 70%
-      const left = Math.random() * 50 + 20; // Entre 20% et 70%
+      // Générer une position aléatoire avec des marges encore plus importantes
+      const top = Math.random() * 40 + 25; // Entre 25% et 65% (zone plus restreinte)
+      const left = Math.random() * 40 + 25; // Entre 25% et 65%
       newPosition = { top: `${top}%`, left: `${left}%` };
       
       // Vérifier la distance avec toutes les positions existantes
       isValid = positions.every(pos => {
         const topDiff = Math.abs(parseFloat(pos.top) - parseFloat(newPosition.top));
         const leftDiff = Math.abs(parseFloat(pos.left) - parseFloat(newPosition.left));
+        // Les deux distances doivent être suffisantes
         return topDiff >= minDistancePercent && leftDiff >= minDistancePercent;
       });
       
       attempts++;
-    } while (!isValid && attempts < 100);
+    } while (!isValid && attempts < 150); // Plus de tentatives
     
-    // Si on n'arrive pas à trouver une position valide, utiliser des positions prédéfinies
+    // Si on n'arrive pas à trouver une position valide, utiliser des positions prédéfinies bien espacées
     if (!isValid) {
       const fallbackPositions = [
-        { top: '25%', left: '25%' },
-        { top: '25%', left: '75%' },
-        { top: '75%', left: '25%' },
-        { top: '75%', left: '75%' }
+        { top: '30%', left: '30%' },
+        { top: '30%', left: '70%' },
+        { top: '70%', left: '30%' },
+        { top: '70%', left: '70%' }
       ];
       newPosition = fallbackPositions[i] || fallbackPositions[0];
     }
@@ -631,16 +632,17 @@ export const FractionGame: React.FC = () => {
       console.log('💥 BONK! Son d\'assommage !');
     }
     
-    // Mettre à jour les animations - toutes les taupes sont "assommées" d'abord
-    const newAnimations: Array<'none' | 'correct' | 'incorrect' | 'knocked'> = ['knocked', 'knocked', 'knocked', 'knocked'];
+    // Mettre à jour les animations - SEULE la taupe frappée est assommée
+    const newAnimations: Array<'none' | 'correct' | 'incorrect' | 'knocked'> = ['none', 'none', 'none', 'none'];
+    newAnimations[moleIndex] = 'knocked'; // Seule la taupe cliquée est assommée
+    
+    setMoleAnimations([...newAnimations]);
     
     // Puis on indique la bonne réponse après un court délai
     setTimeout(() => {
       newAnimations[moleIndex] = isCorrect ? 'correct' : 'incorrect';
       setMoleAnimations([...newAnimations]);
-    }, 400);
-    
-    setMoleAnimations(newAnimations);
+    }, 600);
     
     // Mettre à jour le score
     const scoreChange = isCorrect ? 3 : -1;
