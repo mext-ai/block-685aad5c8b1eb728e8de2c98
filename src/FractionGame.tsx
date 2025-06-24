@@ -22,7 +22,8 @@ interface MoleProps {
   isCorrect: boolean;
   onClick: () => void;
   isVisible: boolean;
-  animationState: 'none' | 'correct' | 'incorrect';
+  animationState: 'none' | 'correct' | 'incorrect' | 'knocked';
+  timeLeft: number;
 }
 
 interface GameStats {
@@ -66,29 +67,42 @@ const fractionsEqual = (f1: Fraction, f2: Fraction): boolean => {
   return s1.numerator === s2.numerator && s1.denominator === s2.denominator;
 };
 
-// Générer des positions aléatoires pour les taupes
+// Améliorer la génération de positions pour éviter les superpositions
 const generateRandomPositions = (): Array<{ top: string; left: string }> => {
   const positions: Array<{ top: string; left: string }> = [];
-  const minDistance = 150; // Distance minimale entre les taupes en pixels
+  const minDistancePercent = 25; // Distance minimale de 25% pour éviter les chevauchements
   
   for (let i = 0; i < 4; i++) {
     let attempts = 0;
     let newPosition: { top: string; left: string };
+    let isValid = false;
     
     do {
-      // Générer une position aléatoire avec des marges
-      const top = Math.random() * 60 + 15; // Entre 15% et 75%
-      const left = Math.random() * 60 + 15; // Entre 15% et 75%
+      // Générer une position aléatoire avec des marges plus importantes
+      const top = Math.random() * 50 + 20; // Entre 20% et 70%
+      const left = Math.random() * 50 + 20; // Entre 20% et 70%
       newPosition = { top: `${top}%`, left: `${left}%` };
-      attempts++;
-    } while (
-      attempts < 50 && 
-      positions.some(pos => {
+      
+      // Vérifier la distance avec toutes les positions existantes
+      isValid = positions.every(pos => {
         const topDiff = Math.abs(parseFloat(pos.top) - parseFloat(newPosition.top));
         const leftDiff = Math.abs(parseFloat(pos.left) - parseFloat(newPosition.left));
-        return topDiff < 20 || leftDiff < 20; // Éviter les positions trop proches
-      })
-    );
+        return topDiff >= minDistancePercent && leftDiff >= minDistancePercent;
+      });
+      
+      attempts++;
+    } while (!isValid && attempts < 100);
+    
+    // Si on n'arrive pas à trouver une position valide, utiliser des positions prédéfinies
+    if (!isValid) {
+      const fallbackPositions = [
+        { top: '25%', left: '25%' },
+        { top: '25%', left: '75%' },
+        { top: '75%', left: '25%' },
+        { top: '75%', left: '75%' }
+      ];
+      newPosition = fallbackPositions[i] || fallbackPositions[0];
+    }
     
     positions.push(newPosition);
   }
@@ -96,14 +110,29 @@ const generateRandomPositions = (): Array<{ top: string; left: string }> => {
   return positions;
 };
 
-// Composant Taupe améliorée
-const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isVisible, animationState }) => {
+// Composant Taupe améliorée avec trou fixe
+const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isVisible, animationState, timeLeft }) => {
   const moleRef = useRef<HTMLDivElement>(null);
 
   const getMoleColor = () => {
     if (animationState === 'correct') return '#4CAF50';
     if (animationState === 'incorrect') return '#F44336';
+    if (animationState === 'knocked') return '#FFD700'; // Couleur dorée pour l'assommage
     return '#8B4513';
+  };
+
+  // Animation de sortie progressive basée sur le temps
+  const getMoleTransform = () => {
+    if (!isVisible) return 'translateY(60px)'; // Complètement dans le trou
+    
+    if (animationState === 'knocked') {
+      return 'translateY(50px) rotate(25deg)'; // Assommée, retombe dans le trou
+    }
+    
+    // Sortie progressive en fonction du temps restant (10s -> 0s)
+    const progress = Math.max(0, (10 - timeLeft) / 10); // 0 à 1
+    const yOffset = 60 - (progress * 75); // De 60px (dans le trou) à -15px (complètement sorti)
+    return `translateY(${yOffset}px)`;
   };
 
   return (
@@ -117,70 +146,70 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: isVisible ? 10 : 1,
-        transition: 'all 0.4s ease-in-out',
-        opacity: isVisible ? 1 : 0,
-        animation: animationState !== 'none' ? `${animationState}Animation 0.6s ease-in-out` : undefined
+        zIndex: 5
       }}
     >
-      {/* Trou dans le sol - circulaire et sombre */}
-      <div
-        style={{
-          width: '140px',
-          height: '90px',
-          backgroundColor: '#1a1a1a',
-          borderRadius: '50%',
-          position: 'absolute',
-          bottom: '-20px',
-          zIndex: 1,
-          boxShadow: 'inset 0 8px 20px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5)',
-          border: '3px solid #0d0d0d'
-        }}
-      />
-      
-      {/* Ombre du trou pour plus de profondeur */}
+      {/* Trou dans le sol - FIXE, ne bouge jamais */}
       <div
         style={{
           width: '160px',
-          height: '30px',
-          backgroundColor: 'rgba(0,0,0,0.3)',
+          height: '100px',
+          backgroundColor: '#0d0d0d',
           borderRadius: '50%',
           position: 'absolute',
-          bottom: '-10px',
-          zIndex: 0,
-          filter: 'blur(8px)'
+          bottom: '-30px',
+          zIndex: 1,
+          boxShadow: 'inset 0 12px 25px rgba(0,0,0,0.95), 0 0 15px rgba(0,0,0,0.6)',
+          border: '4px solid #000000'
         }}
       />
       
-      {/* Taupe améliorée */}
+      {/* Ombre du trou pour plus de profondeur - FIXE */}
+      <div
+        style={{
+          width: '180px',
+          height: '35px',
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          borderRadius: '50%',
+          position: 'absolute',
+          bottom: '-15px',
+          zIndex: 0,
+          filter: 'blur(10px)'
+        }}
+      />
+      
+      {/* Taupe - SEULE À BOUGER */}
       <div
         ref={moleRef}
         onClick={onClick}
         style={{
-          width: '85px',
-          height: '85px',
+          width: '90px',
+          height: '90px',
           backgroundColor: getMoleColor(),
           borderRadius: '50% 50% 45% 45%',
           border: '3px solid #5d2e00',
           cursor: 'none',
           position: 'relative',
-          zIndex: 2,
+          zIndex: 3,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'all 0.3s ease',
+          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.3s ease',
           boxShadow: '0 8px 15px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2)',
-          transform: isVisible ? 'translateY(-15px)' : 'translateY(40px)',
-          background: `radial-gradient(circle at 30% 30%, ${getMoleColor()}, #654321)`
+          transform: getMoleTransform(),
+          background: `radial-gradient(circle at 30% 30%, ${getMoleColor()}, #654321)`,
+          animation: animationState === 'correct' ? 'correctMoleAnimation 0.8s ease-in-out' : 
+                    animationState === 'incorrect' ? 'incorrectMoleAnimation 0.8s ease-in-out' :
+                    animationState === 'knocked' ? 'knockedAnimation 1s ease-in-out' : undefined
         }}
       >
         {/* Oreilles de la taupe */}
         <div style={{ 
           position: 'absolute', 
           top: '5px', 
-          left: '12px', 
-          width: '14px', 
-          height: '22px', 
+          left: '15px', 
+          width: '16px', 
+          height: '24px', 
           backgroundColor: '#5d2e00', 
           borderRadius: '50%', 
           transform: 'rotate(-25deg)',
@@ -189,9 +218,9 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ 
           position: 'absolute', 
           top: '5px', 
-          right: '12px', 
-          width: '14px', 
-          height: '22px', 
+          right: '15px', 
+          width: '16px', 
+          height: '24px', 
           backgroundColor: '#5d2e00', 
           borderRadius: '50%', 
           transform: 'rotate(25deg)',
@@ -202,9 +231,9 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ 
           position: 'absolute', 
           top: '10px', 
-          left: '16px', 
-          width: '6px', 
-          height: '10px', 
+          left: '19px', 
+          width: '8px', 
+          height: '12px', 
           backgroundColor: '#FF69B4', 
           borderRadius: '50%', 
           transform: 'rotate(-25deg)'
@@ -212,118 +241,154 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ 
           position: 'absolute', 
           top: '10px', 
-          right: '16px', 
-          width: '6px', 
-          height: '10px', 
+          right: '19px', 
+          width: '8px', 
+          height: '12px', 
           backgroundColor: '#FF69B4', 
           borderRadius: '50%', 
           transform: 'rotate(25deg)'
         }} />
         
-        {/* Yeux de la taupe */}
+        {/* Yeux de la taupe - changeant selon l'état */}
         <div style={{ 
           position: 'absolute', 
-          top: '28px', 
-          left: '20px', 
-          width: '10px', 
-          height: '10px', 
+          top: '30px', 
+          left: '22px', 
+          width: '12px', 
+          height: animationState === 'knocked' ? '6px' : '12px', // Yeux fermés si assommée
           backgroundColor: 'black', 
           borderRadius: '50%',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.5)'
+          boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
+          transform: animationState === 'knocked' ? 'scaleY(0.3)' : 'scaleY(1)'
         }} />
         <div style={{ 
           position: 'absolute', 
-          top: '28px', 
-          right: '20px', 
-          width: '10px', 
-          height: '10px', 
+          top: '30px', 
+          right: '22px', 
+          width: '12px', 
+          height: animationState === 'knocked' ? '6px' : '12px',
           backgroundColor: 'black', 
           borderRadius: '50%',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.5)'
+          boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
+          transform: animationState === 'knocked' ? 'scaleY(0.3)' : 'scaleY(1)'
         }} />
         
-        {/* Reflets dans les yeux */}
-        <div style={{ 
-          position: 'absolute', 
-          top: '29px', 
-          left: '22px', 
-          width: '4px', 
-          height: '4px', 
-          backgroundColor: 'white', 
-          borderRadius: '50%'
-        }} />
-        <div style={{ 
-          position: 'absolute', 
-          top: '29px', 
-          right: '22px', 
-          width: '4px', 
-          height: '4px', 
-          backgroundColor: 'white', 
-          borderRadius: '50%'
-        }} />
+        {/* Reflets dans les yeux - seulement si pas assommée */}
+        {animationState !== 'knocked' && (
+          <>
+            <div style={{ 
+              position: 'absolute', 
+              top: '32px', 
+              left: '25px', 
+              width: '4px', 
+              height: '4px', 
+              backgroundColor: 'white', 
+              borderRadius: '50%'
+            }} />
+            <div style={{ 
+              position: 'absolute', 
+              top: '32px', 
+              right: '25px', 
+              width: '4px', 
+              height: '4px', 
+              backgroundColor: 'white', 
+              borderRadius: '50%'
+            }} />
+          </>
+        )}
         
         {/* Nez de la taupe */}
         <div style={{ 
           position: 'absolute', 
-          top: '42px', 
+          top: '45px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
-          width: '8px', 
-          height: '6px', 
+          width: '10px', 
+          height: '8px', 
           backgroundColor: '#FF1493', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
         }} />
         
-        {/* Bouche */}
+        {/* Bouche - change selon l'état */}
         <div style={{ 
           position: 'absolute', 
-          top: '52px', 
+          top: '55px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
-          width: '3px', 
-          height: '10px', 
+          width: '4px', 
+          height: animationState === 'knocked' ? '15px' : '12px', // Bouche ouverte si assommée
           backgroundColor: 'black', 
-          borderRadius: '2px'
+          borderRadius: animationState === 'knocked' ? '50%' : '2px'
         }} />
         
         {/* Moustaches */}
-        <div style={{ position: 'absolute', top: '44px', left: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '48px', left: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '44px', right: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '48px', right: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '47px', left: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '51px', left: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '47px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '51px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
+        
+        {/* Étoiles d'assommage */}
+        {animationState === 'knocked' && (
+          <>
+            <div style={{ 
+              position: 'absolute', 
+              top: '-10px', 
+              left: '10px', 
+              fontSize: '20px',
+              animation: 'sparkle 1s infinite'
+            }}>⭐</div>
+            <div style={{ 
+              position: 'absolute', 
+              top: '-15px', 
+              right: '15px', 
+              fontSize: '16px',
+              animation: 'sparkle 1s infinite 0.3s'
+            }}>✨</div>
+            <div style={{ 
+              position: 'absolute', 
+              top: '-5px', 
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: '18px',
+              animation: 'sparkle 1s infinite 0.6s'
+            }}>💫</div>
+          </>
+        )}
       </div>
       
-      {/* Panneau avec la réponse */}
+      {/* Panneau avec la réponse - Se déplace avec la taupe */}
       <div
         style={{
           backgroundColor: '#FFF8DC',
           color: '#8B4513',
-          padding: '12px 18px',
+          padding: '14px 20px',
           borderRadius: '12px',
           border: '3px solid #8B4513',
-          fontSize: '20px',
+          fontSize: '22px',
           fontWeight: 'bold',
-          marginTop: '20px',
+          marginTop: '25px',
           boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
-          zIndex: 3,
-          minWidth: '70px',
+          zIndex: 4,
+          minWidth: '80px',
           textAlign: 'center',
           position: 'relative',
-          transform: 'rotate(-1deg)',
-          background: 'linear-gradient(145deg, #FFF8DC, #F5DEB3)'
+          transform: `rotate(-1deg) ${getMoleTransform()}`, // Suit le mouvement de la taupe
+          background: 'linear-gradient(145deg, #FFF8DC, #F5DEB3)',
+          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.3s ease',
+          opacity: isVisible ? 1 : 0
         }}
       >
         {/* Poteau du panneau */}
         <div style={{
           position: 'absolute',
-          bottom: '-15px',
+          bottom: '-18px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '6px',
-          height: '20px',
+          width: '8px',
+          height: '25px',
           backgroundColor: '#8B4513',
-          borderRadius: '3px'
+          borderRadius: '4px'
         }} />
         {fractionToString(fraction)}
       </div>
@@ -395,7 +460,7 @@ export const FractionGame: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [molesVisible, setMolesVisible] = useState(false);
   const [selectedMole, setSelectedMole] = useState<number | null>(null);
-  const [moleAnimations, setMoleAnimations] = useState<Array<'none' | 'correct' | 'incorrect'>>([]);
+  const [moleAnimations, setMoleAnimations] = useState<Array<'none' | 'correct' | 'incorrect' | 'knocked'>>([]);
   const [questionAnswered, setQuestionAnswered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -546,7 +611,7 @@ export const FractionGame: React.FC = () => {
     // Afficher les taupes après un petit délai
     setTimeout(() => {
       setMolesVisible(true);
-    }, 800);
+    }, 1000);
   };
 
   // Gérer la sélection d'une taupe
@@ -563,12 +628,18 @@ export const FractionGame: React.FC = () => {
     if (isCorrect) {
       console.log('🎉 DING! Son de succès !');
     } else {
-      console.log('❌ BONK! Son d\'échec !');
+      console.log('💥 BONK! Son d\'assommage !');
     }
     
-    // Mettre à jour les animations
-    const newAnimations = ['none', 'none', 'none', 'none'];
-    newAnimations[moleIndex] = isCorrect ? 'correct' : 'incorrect';
+    // Mettre à jour les animations - toutes les taupes sont "assommées" d'abord
+    const newAnimations: Array<'none' | 'correct' | 'incorrect' | 'knocked'> = ['knocked', 'knocked', 'knocked', 'knocked'];
+    
+    // Puis on indique la bonne réponse après un court délai
+    setTimeout(() => {
+      newAnimations[moleIndex] = isCorrect ? 'correct' : 'incorrect';
+      setMoleAnimations([...newAnimations]);
+    }, 400);
+    
     setMoleAnimations(newAnimations);
     
     // Mettre à jour le score
@@ -581,7 +652,7 @@ export const FractionGame: React.FC = () => {
     // Passer à la question suivante après un délai
     setTimeout(() => {
       nextQuestion();
-    }, 1800);
+    }, 2200);
   };
 
   // Passer à la question suivante
@@ -608,21 +679,22 @@ export const FractionGame: React.FC = () => {
       setMolesVisible(false);
       setTimeout(() => {
         initializeQuestion();
-      }, 600);
+      }, 800);
     }
   };
 
-  // Timer effect
+  // Timer effect avec animation de sortie progressive
   useEffect(() => {
     if (gameState === 'finished' || questionAnswered) return;
     
     const timer = setInterval(() => {
       setStats(prev => {
         if (prev.timeLeft <= 1) {
-          // Temps écoulé, passer à la question suivante
+          // Temps écoulé, toutes les taupes rentrent dans leurs trous
+          setMolesVisible(false);
           setTimeout(() => {
             nextQuestion();
-          }, 100);
+          }, 500);
           return { ...prev, timeLeft: 0 };
         }
         return { ...prev, timeLeft: prev.timeLeft - 1 };
@@ -710,7 +782,14 @@ export const FractionGame: React.FC = () => {
   }
 
   if (!currentQuestion) {
-    return <div>Chargement...</div>;
+    return <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      fontSize: '1.5rem',
+      background: 'linear-gradient(135deg, #87CEEB 0%, #98FB98 100%)'
+    }}>Chargement...</div>;
   }
 
   return (
@@ -810,6 +889,7 @@ export const FractionGame: React.FC = () => {
             onClick={() => handleMoleClick(index)}
             isVisible={molesVisible}
             animationState={moleAnimations[index]}
+            timeLeft={stats.timeLeft}
           />
         ))}
       </div>
@@ -817,19 +897,28 @@ export const FractionGame: React.FC = () => {
       {/* Styles CSS pour les animations */}
       <style>
         {`
-          @keyframes correctAnimation {
-            0% { transform: scale(1) translateY(-15px); }
-            50% { transform: scale(1.4) translateY(-25px) rotate(5deg); }
-            100% { transform: scale(1) translateY(-15px); }
+          @keyframes correctMoleAnimation {
+            0% { transform: translateY(-15px) scale(1); }
+            50% { transform: translateY(-30px) scale(1.3); background-color: #4CAF50; }
+            100% { transform: translateY(-15px) scale(1); }
           }
           
-          @keyframes incorrectAnimation {
-            0% { transform: scale(1) translateY(-15px) rotate(0deg); }
-            20% { transform: scale(1.2) translateY(-15px) rotate(-15deg); }
-            40% { transform: scale(1.2) translateY(-15px) rotate(15deg); }
-            60% { transform: scale(1.2) translateY(-15px) rotate(-10deg); }
-            80% { transform: scale(1.2) translateY(-15px) rotate(10deg); }
-            100% { transform: scale(1) translateY(-15px) rotate(0deg); }
+          @keyframes incorrectMoleAnimation {
+            0% { transform: translateY(-15px) scale(1) rotate(0deg); }
+            25% { transform: translateY(-15px) scale(1.1) rotate(-10deg); background-color: #F44336; }
+            75% { transform: translateY(-15px) scale(1.1) rotate(10deg); background-color: #F44336; }
+            100% { transform: translateY(-15px) scale(1) rotate(0deg); }
+          }
+          
+          @keyframes knockedAnimation {
+            0% { transform: translateY(-15px) rotate(0deg); }
+            50% { transform: translateY(40px) rotate(25deg) scale(0.8); }
+            100% { transform: translateY(50px) rotate(25deg) scale(0.8); }
+          }
+          
+          @keyframes sparkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1.2); }
           }
           
           @keyframes pulse {
