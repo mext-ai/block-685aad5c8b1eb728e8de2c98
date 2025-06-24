@@ -7,11 +7,12 @@ interface Fraction {
 }
 
 interface Question {
-  fraction1: Fraction;
-  fraction2: Fraction;
-  operation: '+' | '-';
+  fraction1?: Fraction;
+  fraction2?: Fraction;
+  operation: '+' | '-' | 'simplify';
   correctAnswer: Fraction;
   options: Fraction[];
+  questionText: string;
 }
 
 interface MoleProps {
@@ -64,17 +65,18 @@ const fractionsEqual = (f1: Fraction, f2: Fraction): boolean => {
   return s1.numerator === s2.numerator && s1.denominator === s2.denominator;
 };
 
-// Composant Taupe
+// Composant Taupe améliorée
 const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isVisible, animationState }) => {
   const moleRef = useRef<HTMLDivElement>(null);
 
-  const getPositionStyle = (pos: number) => {
-    const row = Math.floor(pos / 3);
-    const col = pos % 3;
-    return {
-      gridRow: row + 1,
-      gridColumn: col + 1
-    };
+  const getHolePosition = (pos: number) => {
+    const positions = [
+      { top: '15%', left: '20%' },
+      { top: '15%', right: '20%' },
+      { top: '50%', left: '15%' },
+      { top: '50%', right: '15%' },
+    ];
+    return positions[pos] || positions[0];
   };
 
   const getMoleColor = () => {
@@ -86,79 +88,167 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
   return (
     <div
       style={{
-        ...getPositionStyle(position),
+        position: 'absolute',
+        ...getHolePosition(position),
+        transform: 'translate(-50%, -50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'relative',
-        transform: isVisible ? 'translateY(0)' : 'translateY(100px)',
-        transition: 'transform 0.3s ease-in-out',
+        zIndex: isVisible ? 10 : 1,
+        transition: 'all 0.3s ease-in-out',
         opacity: isVisible ? 1 : 0,
         animation: animationState !== 'none' ? `${animationState}Animation 0.5s ease-in-out` : undefined
       }}
     >
-      {/* Trou de taupe */}
+      {/* Trou circulaire */}
       <div
         style={{
-          width: '80px',
-          height: '40px',
-          backgroundColor: '#654321',
-          borderRadius: '50px',
-          border: '3px solid #4a2c17',
+          width: '120px',
+          height: '80px',
+          backgroundColor: '#2d1810',
+          borderRadius: '50%',
+          border: '4px solid #1a0e08',
           position: 'absolute',
-          bottom: '10px',
-          zIndex: 1
+          bottom: '0',
+          zIndex: 1,
+          boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.8)'
         }}
       />
       
-      {/* Taupe */}
+      {/* Taupe améliorée */}
       <div
         ref={moleRef}
         onClick={onClick}
         style={{
-          width: '60px',
-          height: '60px',
+          width: '80px',
+          height: '80px',
           backgroundColor: getMoleColor(),
-          borderRadius: '50%',
-          border: '2px solid #5d2e00',
-          cursor: 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'><rect x=\'12\' y=\'4\' width=\'8\' height=\'20\' fill=\'%23654321\'/><rect x=\'8\' y=\'20\' width=\'16\' height=\'8\' fill=\'%23654321\'/></svg>") 16 16, pointer',
+          borderRadius: '50% 50% 45% 45%',
+          border: '3px solid #5d2e00',
+          cursor: 'none', // On va utiliser un curseur personnalisé global
           position: 'relative',
           zIndex: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 0.2s ease',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+          boxShadow: '0 6px 12px rgba(0,0,0,0.4)',
+          transform: isVisible ? 'translateY(-10px)' : 'translateY(30px)',
+          background: `linear-gradient(145deg, ${getMoleColor()}, #654321)`
         }}
       >
+        {/* Oreilles de la taupe */}
+        <div style={{ position: 'absolute', top: '8px', left: '15px', width: '12px', height: '20px', backgroundColor: '#5d2e00', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
+        <div style={{ position: 'absolute', top: '8px', right: '15px', width: '12px', height: '20px', backgroundColor: '#5d2e00', borderRadius: '50%', transform: 'rotate(20deg)' }} />
+        
         {/* Yeux de la taupe */}
-        <div style={{ position: 'absolute', top: '15px', left: '18px', width: '6px', height: '6px', backgroundColor: 'black', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', top: '15px', right: '18px', width: '6px', height: '6px', backgroundColor: 'black', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '25px', left: '22px', width: '8px', height: '8px', backgroundColor: 'black', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '25px', right: '22px', width: '8px', height: '8px', backgroundColor: 'black', borderRadius: '50%' }} />
+        
+        {/* Reflets dans les yeux */}
+        <div style={{ position: 'absolute', top: '26px', left: '24px', width: '3px', height: '3px', backgroundColor: 'white', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '26px', right: '24px', width: '3px', height: '3px', backgroundColor: 'white', borderRadius: '50%' }} />
         
         {/* Nez de la taupe */}
-        <div style={{ position: 'absolute', top: '25px', left: '50%', transform: 'translateX(-50%)', width: '4px', height: '4px', backgroundColor: 'black', borderRadius: '50%' }} />
+        <div style={{ position: 'absolute', top: '38px', left: '50%', transform: 'translateX(-50%)', width: '6px', height: '6px', backgroundColor: '#FF69B4', borderRadius: '50%' }} />
+        
+        {/* Bouche */}
+        <div style={{ position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '2px', height: '8px', backgroundColor: 'black', borderRadius: '2px' }} />
+        
+        {/* Moustaches */}
+        <div style={{ position: 'absolute', top: '40px', left: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '44px', left: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '40px', right: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '44px', right: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
       </div>
       
-      {/* Panneau avec la réponse */}
+      {/* Panneau avec la réponse amélioré */}
       <div
         style={{
-          backgroundColor: 'white',
-          color: 'black',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          border: '2px solid #333',
-          fontSize: '16px',
+          backgroundColor: '#FFF8DC',
+          color: '#8B4513',
+          padding: '10px 15px',
+          borderRadius: '12px',
+          border: '3px solid #8B4513',
+          fontSize: '18px',
           fontWeight: 'bold',
-          marginTop: '10px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          marginTop: '15px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
           zIndex: 3,
-          minWidth: '50px',
-          textAlign: 'center'
+          minWidth: '60px',
+          textAlign: 'center',
+          position: 'relative',
+          transform: 'rotate(-2deg)'
         }}
       >
+        {/* Poteau du panneau */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '4px',
+          height: '15px',
+          backgroundColor: '#8B4513'
+        }} />
         {fractionToString(fraction)}
       </div>
+    </div>
+  );
+};
+
+// Curseur marteau personnalisé
+const HammerCursor: React.FC<{ mousePosition: { x: number; y: number } }> = ({ mousePosition }) => {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: mousePosition.x - 20,
+        top: mousePosition.y - 10,
+        width: '40px',
+        height: '40px',
+        pointerEvents: 'none',
+        zIndex: 1000,
+        transform: 'rotate(-15deg)'
+      }}
+    >
+      {/* Manche du marteau */}
+      <div style={{
+        position: 'absolute',
+        bottom: '0',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '6px',
+        height: '30px',
+        backgroundColor: '#8B4513',
+        borderRadius: '3px'
+      }} />
+      
+      {/* Tête du marteau */}
+      <div style={{
+        position: 'absolute',
+        top: '0',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '20px',
+        height: '12px',
+        backgroundColor: '#696969',
+        borderRadius: '2px',
+        border: '1px solid #2F4F4F'
+      }} />
+      
+      {/* Reflet métallique */}
+      <div style={{
+        position: 'absolute',
+        top: '2px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '16px',
+        height: '3px',
+        backgroundColor: '#C0C0C0',
+        borderRadius: '1px'
+      }} />
     </div>
   );
 };
@@ -166,52 +256,140 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
 // Composant principal du jeu
 export const FractionGame: React.FC = () => {
   const [gameState, setGameState] = useState<'playing' | 'finished'>('playing');
-  const [stats, setStats] = useState<GameStats>({ score: 0, currentQuestion: 1, timeLeft: 5 });
+  const [stats, setStats] = useState<GameStats>({ score: 0, currentQuestion: 1, timeLeft: 10 });
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [molesVisible, setMolesVisible] = useState(false);
   const [selectedMole, setSelectedMole] = useState<number | null>(null);
   const [moleAnimations, setMoleAnimations] = useState<Array<'none' | 'correct' | 'incorrect'>>([]);
   const [questionAnswered, setQuestionAnswered] = useState(false);
-  const [showNextQuestion, setShowNextQuestion] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Suivre la position de la souris
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   // Générer une question aléatoire
   const generateQuestion = (): Question => {
-    const denominators = [2, 3, 4, 5, 6, 8, 10, 12];
-    const numerators = [1, 2, 3, 4, 5, 7, 9, 11];
+    const questionType = Math.random();
+    const denominators = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+    const numerators = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     
-    const fraction1: Fraction = {
-      numerator: numerators[Math.floor(Math.random() * numerators.length)],
-      denominator: denominators[Math.floor(Math.random() * denominators.length)]
-    };
-    
-    const fraction2: Fraction = {
-      numerator: numerators[Math.floor(Math.random() * numerators.length)],
-      denominator: denominators[Math.floor(Math.random() * denominators.length)]
-    };
-    
-    const operation = Math.random() > 0.5 ? '+' : '-';
-    const correctAnswer = operation === '+' 
-      ? addFractions(fraction1, fraction2)
-      : subtractFractions(fraction1, fraction2);
-    
-    // Générer 3 réponses incorrectes
-    const wrongAnswers: Fraction[] = [];
-    while (wrongAnswers.length < 3) {
-      const wrongFraction: Fraction = {
-        numerator: Math.floor(Math.random() * 20) + 1,
-        denominator: Math.floor(Math.random() * 15) + 1
+    if (questionType < 0.33) {
+      // Addition
+      const fraction1: Fraction = {
+        numerator: numerators[Math.floor(Math.random() * numerators.length)],
+        denominator: denominators[Math.floor(Math.random() * denominators.length)]
       };
       
-      if (!fractionsEqual(wrongFraction, correctAnswer) && 
-          !wrongAnswers.some(w => fractionsEqual(w, wrongFraction))) {
-        wrongAnswers.push(simplifyFraction(wrongFraction));
+      const fraction2: Fraction = {
+        numerator: numerators[Math.floor(Math.random() * numerators.length)],
+        denominator: denominators[Math.floor(Math.random() * denominators.length)]
+      };
+      
+      const correctAnswer = addFractions(fraction1, fraction2);
+      const wrongAnswers = generateWrongAnswers(correctAnswer, 3);
+      const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+      
+      return {
+        fraction1,
+        fraction2,
+        operation: '+',
+        correctAnswer,
+        options,
+        questionText: `${fractionToString(fraction1)} + ${fractionToString(fraction2)} = ?`
+      };
+    } else if (questionType < 0.66) {
+      // Soustraction
+      const fraction1: Fraction = {
+        numerator: numerators[Math.floor(Math.random() * numerators.length)],
+        denominator: denominators[Math.floor(Math.random() * denominators.length)]
+      };
+      
+      const fraction2: Fraction = {
+        numerator: numerators[Math.floor(Math.random() * numerators.length)],
+        denominator: denominators[Math.floor(Math.random() * denominators.length)]
+      };
+      
+      const correctAnswer = subtractFractions(fraction1, fraction2);
+      const wrongAnswers = generateWrongAnswers(correctAnswer, 3);
+      const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+      
+      return {
+        fraction1,
+        fraction2,
+        operation: '-',
+        correctAnswer,
+        options,
+        questionText: `${fractionToString(fraction1)} - ${fractionToString(fraction2)} = ?`
+      };
+    } else {
+      // Simplification
+      const baseFraction: Fraction = {
+        numerator: numerators[Math.floor(Math.random() * numerators.length)],
+        denominator: denominators[Math.floor(Math.random() * denominators.length)]
+      };
+      
+      // Créer une fraction non simplifiée en multipliant par un facteur commun
+      const factor = Math.floor(Math.random() * 4) + 2; // facteur entre 2 et 5
+      const unsimplifiedFraction: Fraction = {
+        numerator: baseFraction.numerator * factor,
+        denominator: baseFraction.denominator * factor
+      };
+      
+      const correctAnswer = simplifyFraction(unsimplifiedFraction);
+      const wrongAnswers = generateWrongAnswers(correctAnswer, 3);
+      const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+      
+      return {
+        operation: 'simplify',
+        correctAnswer,
+        options,
+        questionText: `Simplifie : ${fractionToString(unsimplifiedFraction)} = ?`
+      };
+    }
+  };
+
+  // Générer des réponses incorrectes
+  const generateWrongAnswers = (correctAnswer: Fraction, count: number): Fraction[] => {
+    const wrongAnswers: Fraction[] = [];
+    const maxAttempts = 50;
+    let attempts = 0;
+    
+    while (wrongAnswers.length < count && attempts < maxAttempts) {
+      attempts++;
+      const wrongFraction: Fraction = {
+        numerator: Math.floor(Math.random() * 25) + 1,
+        denominator: Math.floor(Math.random() * 20) + 1
+      };
+      
+      const simplified = simplifyFraction(wrongFraction);
+      
+      if (!fractionsEqual(simplified, correctAnswer) && 
+          !wrongAnswers.some(w => fractionsEqual(w, simplified))) {
+        wrongAnswers.push(simplified);
       }
     }
     
-    // Mélanger les options
-    const options = [correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+    // Si on n'a pas assez de mauvaises réponses, en générer des basiques
+    while (wrongAnswers.length < count) {
+      const num = correctAnswer.numerator + Math.floor(Math.random() * 6) - 3;
+      const den = correctAnswer.denominator + Math.floor(Math.random() * 6) - 3;
+      if (num > 0 && den > 0) {
+        const wrongFraction = simplifyFraction({ numerator: num, denominator: den });
+        if (!fractionsEqual(wrongFraction, correctAnswer) && 
+            !wrongAnswers.some(w => fractionsEqual(w, wrongFraction))) {
+          wrongAnswers.push(wrongFraction);
+        }
+      }
+    }
     
-    return { fraction1, fraction2, operation, correctAnswer, options };
+    return wrongAnswers.slice(0, count);
   };
 
   // Initialiser une nouvelle question
@@ -222,8 +400,7 @@ export const FractionGame: React.FC = () => {
     setSelectedMole(null);
     setMoleAnimations(['none', 'none', 'none', 'none']);
     setQuestionAnswered(false);
-    setShowNextQuestion(false);
-    setStats(prev => ({ ...prev, timeLeft: 5 }));
+    setStats(prev => ({ ...prev, timeLeft: 10 }));
     
     // Afficher les taupes après un petit délai
     setTimeout(() => {
@@ -243,9 +420,9 @@ export const FractionGame: React.FC = () => {
     
     // Jouer un son (simulation)
     if (isCorrect) {
-      console.log('🎉 Son de succès !');
+      console.log('🎉 DING! Son de succès !');
     } else {
-      console.log('❌ Son d\'échec !');
+      console.log('❌ BONK! Son d\'échec !');
     }
     
     // Mettre à jour les animations
@@ -330,7 +507,7 @@ export const FractionGame: React.FC = () => {
 
   const restartGame = () => {
     setGameState('playing');
-    setStats({ score: 0, currentQuestion: 1, timeLeft: 5 });
+    setStats({ score: 0, currentQuestion: 1, timeLeft: 10 });
     initializeQuestion();
   };
 
@@ -348,12 +525,13 @@ export const FractionGame: React.FC = () => {
         textAlign: 'center',
         padding: '20px'
       }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: '20px' }}>🎯 Jeu Terminé !</h1>
+        <h1 style={{ fontSize: '3rem', marginBottom: '20px', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>🎯 Jeu Terminé !</h1>
         <div style={{
           background: 'rgba(255,255,255,0.2)',
           padding: '30px',
           borderRadius: '20px',
-          backdropFilter: 'blur(10px)'
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 8px 16px rgba(0,0,0,0.3)'
         }}>
           <h2 style={{ fontSize: '2rem', marginBottom: '15px' }}>
             Score Final: {stats.score}/30
@@ -371,10 +549,17 @@ export const FractionGame: React.FC = () => {
               border: 'none',
               borderRadius: '10px',
               cursor: 'pointer',
-              transition: 'background-color 0.3s'
+              transition: 'all 0.3s',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
             }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#45a049'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#4CAF50'}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#45a049';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#4CAF50';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
             🔄 Rejouer
           </button>
@@ -394,8 +579,12 @@ export const FractionGame: React.FC = () => {
       fontFamily: 'Arial, sans-serif',
       padding: '20px',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      cursor: 'none' // Cacher le curseur par défaut
     }}>
+      {/* Curseur marteau personnalisé */}
+      <HammerCursor mousePosition={mousePosition} />
+
       {/* En-tête avec les statistiques */}
       <div style={{
         display: 'flex',
@@ -407,16 +596,17 @@ export const FractionGame: React.FC = () => {
         borderRadius: '15px',
         boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
       }}>
-        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333' }}>
           Question {stats.currentQuestion}/10
         </div>
-        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333' }}>
           Score: {stats.score}
         </div>
         <div style={{ 
           fontSize: '1.2rem', 
           fontWeight: 'bold',
-          color: stats.timeLeft <= 2 ? '#ff4444' : '#333'
+          color: stats.timeLeft <= 3 ? '#ff4444' : '#333',
+          animation: stats.timeLeft <= 3 ? 'pulse 1s infinite' : undefined
         }}>
           ⏰ {stats.timeLeft}s
         </div>
@@ -427,54 +617,44 @@ export const FractionGame: React.FC = () => {
         textAlign: 'center',
         marginBottom: '30px',
         background: 'rgba(255,255,255,0.9)',
-        padding: '20px',
+        padding: '25px',
         borderRadius: '15px',
         boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
       }}>
         <h2 style={{ 
           fontSize: '2.5rem', 
           margin: '0',
-          color: '#333'
+          color: '#333',
+          textShadow: '1px 1px 2px rgba(0,0,0,0.1)'
         }}>
-          {fractionToString(currentQuestion.fraction1)} {currentQuestion.operation} {fractionToString(currentQuestion.fraction2)} = ?
+          {currentQuestion.questionText}
         </h2>
       </div>
 
-      {/* Grille de jeu 3x3 */}
+      {/* Zone de jeu avec trous circulaires */}
       <div style={{
         flex: 1,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gridTemplateRows: 'repeat(3, 1fr)',
-        gap: '20px',
-        maxWidth: '600px',
+        position: 'relative',
+        background: 'linear-gradient(45deg, #8FBC8F 25%, #90EE90 25%, #90EE90 50%, #8FBC8F 50%, #8FBC8F 75%, #90EE90 75%)',
+        backgroundSize: '40px 40px',
+        borderRadius: '20px',
+        border: '4px solid #228B22',
+        maxWidth: '800px',
         margin: '0 auto',
-        width: '100%'
+        width: '100%',
+        boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
       }}>
-        {/* Cases vides pour créer le motif de damier */}
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((index) => (
-          <div
+        {/* Taupes dans leurs trous */}
+        {currentQuestion.options.slice(0, 4).map((fraction, index) => (
+          <Mole
             key={index}
-            style={{
-              backgroundColor: (Math.floor(index / 3) + index) % 2 === 0 ? '#90EE90' : '#87CEEB',
-              borderRadius: '15px',
-              border: '2px solid #fff',
-              position: 'relative',
-              minHeight: '120px'
-            }}
-          >
-            {/* Afficher les taupes seulement dans 4 cases aléatoirement positionnées */}
-            {index < 4 && currentQuestion && (
-              <Mole
-                position={index}
-                fraction={currentQuestion.options[index]}
-                isCorrect={fractionsEqual(currentQuestion.options[index], currentQuestion.correctAnswer)}
-                onClick={() => handleMoleClick(index)}
-                isVisible={molesVisible}
-                animationState={moleAnimations[index]}
-              />
-            )}
-          </div>
+            position={index}
+            fraction={fraction}
+            isCorrect={fractionsEqual(fraction, currentQuestion.correctAnswer)}
+            onClick={() => handleMoleClick(index)}
+            isVisible={molesVisible}
+            animationState={moleAnimations[index]}
+          />
         ))}
       </div>
 
@@ -482,16 +662,22 @@ export const FractionGame: React.FC = () => {
       <style>
         {`
           @keyframes correctAnimation {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); background-color: #4CAF50; }
-            100% { transform: scale(1); }
+            0% { transform: scale(1) translateY(-10px); }
+            50% { transform: scale(1.3) translateY(-20px); }
+            100% { transform: scale(1) translateY(-10px); }
           }
           
           @keyframes incorrectAnimation {
-            0% { transform: scale(1) rotate(0deg); }
-            25% { transform: scale(1.1) rotate(-5deg); background-color: #F44336; }
-            75% { transform: scale(1.1) rotate(5deg); background-color: #F44336; }
-            100% { transform: scale(1) rotate(0deg); }
+            0% { transform: scale(1) translateY(-10px) rotate(0deg); }
+            25% { transform: scale(1.1) translateY(-10px) rotate(-10deg); }
+            75% { transform: scale(1.1) translateY(-10px) rotate(10deg); }
+            100% { transform: scale(1) translateY(-10px) rotate(0deg); }
+          }
+          
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
           }
         `}
       </style>
