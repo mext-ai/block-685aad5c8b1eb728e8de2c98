@@ -22,7 +22,7 @@ interface MoleProps {
   isCorrect: boolean;
   onClick: () => void;
   isVisible: boolean;
-  animationState: 'none' | 'correct' | 'incorrect' | 'knocked';
+  animationState: 'none' | 'correct' | 'incorrect';
   timeLeft: number;
 }
 
@@ -65,6 +65,39 @@ const fractionsEqual = (f1: Fraction, f2: Fraction): boolean => {
   const s1 = simplifyFraction(f1);
   const s2 = simplifyFraction(f2);
   return s1.numerator === s2.numerator && s1.denominator === s2.denominator;
+};
+
+// Fonction pour jouer un bruit sourd
+const playHitSound = () => {
+  // Créer un contexte audio pour générer un son
+  if (typeof AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined') {
+    const AudioContextClass = AudioContext || (window as any).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    
+    // Créer un oscillateur pour le bruit sourd
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Configuration pour un bruit sourd (basse fréquence)
+    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(30, audioContext.currentTime + 0.1);
+    
+    // Enveloppe du son (attaque rapide, déclin progressif)
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.type = 'square'; // Son plus dur
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+    
+    console.log('💥 BONK! Bruit sourd joué !');
+  } else {
+    console.log('💥 BONK! (son non supporté)');
+  }
 };
 
 // Améliorer encore plus la génération de positions pour éviter les superpositions
@@ -116,18 +149,21 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
   const moleRef = useRef<HTMLDivElement>(null);
 
   const getMoleColor = () => {
-    if (animationState === 'correct') return '#4CAF50';
-    if (animationState === 'incorrect') return '#F44336';
-    if (animationState === 'knocked') return '#FFD700'; // Couleur dorée pour l'assommage
-    return '#8B4513';
+    if (animationState === 'correct') return '#4CAF50'; // Vert pour succès
+    if (animationState === 'incorrect') return '#F44336'; // Rouge pour échec
+    return '#8B4513'; // Marron normal
   };
 
   // Animation de sortie progressive basée sur le temps
   const getMoleTransform = () => {
     if (!isVisible) return 'translateY(60px)'; // Complètement dans le trou
     
-    if (animationState === 'knocked') {
-      return 'translateY(50px) rotate(25deg)'; // Assommée, retombe dans le trou
+    if (animationState === 'correct') {
+      return 'translateY(50px) rotate(25deg) scale(0.9)'; // Assommée verte
+    }
+    
+    if (animationState === 'incorrect') {
+      return 'translateY(-5px) scale(1.1)'; // Moqueuse, sort un peu plus
     }
     
     // Sortie progressive en fonction du temps restant (10s -> 0s)
@@ -195,13 +231,10 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.3s ease',
+          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.4s ease',
           boxShadow: '0 8px 15px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2)',
           transform: getMoleTransform(),
-          background: `radial-gradient(circle at 30% 30%, ${getMoleColor()}, #654321)`,
-          animation: animationState === 'correct' ? 'correctMoleAnimation 0.8s ease-in-out' : 
-                    animationState === 'incorrect' ? 'incorrectMoleAnimation 0.8s ease-in-out' :
-                    animationState === 'knocked' ? 'knockedAnimation 1s ease-in-out' : undefined
+          background: `radial-gradient(circle at 30% 30%, ${getMoleColor()}, #654321)`
         }}
       >
         {/* Oreilles de la taupe */}
@@ -256,26 +289,28 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           top: '30px', 
           left: '22px', 
           width: '12px', 
-          height: animationState === 'knocked' ? '6px' : '12px', // Yeux fermés si assommée
+          height: animationState === 'correct' ? '4px' : '12px', // Yeux fermés si assommée (correct)
           backgroundColor: 'black', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
-          transform: animationState === 'knocked' ? 'scaleY(0.3)' : 'scaleY(1)'
+          transform: animationState === 'correct' ? 'scaleY(0.2)' : 
+                    animationState === 'incorrect' ? 'scaleY(1.2)' : 'scaleY(1)' // Yeux plus grands si moqueuse
         }} />
         <div style={{ 
           position: 'absolute', 
           top: '30px', 
           right: '22px', 
           width: '12px', 
-          height: animationState === 'knocked' ? '6px' : '12px',
+          height: animationState === 'correct' ? '4px' : '12px',
           backgroundColor: 'black', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
-          transform: animationState === 'knocked' ? 'scaleY(0.3)' : 'scaleY(1)'
+          transform: animationState === 'correct' ? 'scaleY(0.2)' : 
+                    animationState === 'incorrect' ? 'scaleY(1.2)' : 'scaleY(1)'
         }} />
         
         {/* Reflets dans les yeux - seulement si pas assommée */}
-        {animationState !== 'knocked' && (
+        {animationState !== 'correct' && (
           <>
             <div style={{ 
               position: 'absolute', 
@@ -317,11 +352,27 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           top: '55px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
-          width: '4px', 
-          height: animationState === 'knocked' ? '15px' : '12px', // Bouche ouverte si assommée
+          width: animationState === 'incorrect' ? '20px' : '4px', // Bouche large si moqueuse
+          height: animationState === 'correct' ? '15px' : '12px', // Bouche ouverte si assommée
           backgroundColor: 'black', 
-          borderRadius: animationState === 'knocked' ? '50%' : '2px'
+          borderRadius: animationState === 'correct' ? '50%' : 
+                        animationState === 'incorrect' ? '10px' : '2px', // Sourire moqueur
+          border: animationState === 'incorrect' ? '2px solid black' : 'none'
         }} />
+        
+        {/* Langue moqueuse si incorrect */}
+        {animationState === 'incorrect' && (
+          <div style={{
+            position: 'absolute',
+            top: '58px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '6px',
+            height: '8px',
+            backgroundColor: '#FF69B4',
+            borderRadius: '50%'
+          }} />
+        )}
         
         {/* Moustaches */}
         <div style={{ position: 'absolute', top: '47px', left: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
@@ -329,8 +380,8 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ position: 'absolute', top: '47px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
         <div style={{ position: 'absolute', top: '51px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
         
-        {/* Étoiles d'assommage */}
-        {animationState === 'knocked' && (
+        {/* Étoiles d'assommage pour succès */}
+        {animationState === 'correct' && (
           <>
             <div style={{ 
               position: 'absolute', 
@@ -356,6 +407,26 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
             }}>💫</div>
           </>
         )}
+        
+        {/* Expressions moqueuses pour échec */}
+        {animationState === 'incorrect' && (
+          <>
+            <div style={{ 
+              position: 'absolute', 
+              top: '-15px', 
+              left: '10px', 
+              fontSize: '18px',
+              animation: 'mockingAnimation 0.5s infinite'
+            }}>😝</div>
+            <div style={{ 
+              position: 'absolute', 
+              top: '-10px', 
+              right: '10px', 
+              fontSize: '16px',
+              animation: 'mockingAnimation 0.5s infinite 0.2s'
+            }}>😜</div>
+          </>
+        )}
       </div>
       
       {/* Panneau avec la réponse - Se déplace avec la taupe */}
@@ -376,7 +447,7 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           position: 'relative',
           transform: `rotate(-1deg) ${getMoleTransform()}`, // Suit le mouvement de la taupe
           background: 'linear-gradient(145deg, #FFF8DC, #F5DEB3)',
-          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.3s ease',
+          transition: animationState === 'none' ? 'all 0.5s ease-out' : 'all 0.4s ease',
           opacity: isVisible ? 1 : 0
         }}
       >
@@ -461,7 +532,7 @@ export const FractionGame: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [molesVisible, setMolesVisible] = useState(false);
   const [selectedMole, setSelectedMole] = useState<number | null>(null);
-  const [moleAnimations, setMoleAnimations] = useState<Array<'none' | 'correct' | 'incorrect' | 'knocked'>>([]);
+  const [moleAnimations, setMoleAnimations] = useState<Array<'none' | 'correct' | 'incorrect'>>([]);
   const [questionAnswered, setQuestionAnswered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -625,24 +696,25 @@ export const FractionGame: React.FC = () => {
     const selectedFraction = currentQuestion.options[moleIndex];
     const isCorrect = fractionsEqual(selectedFraction, currentQuestion.correctAnswer);
     
-    // Jouer un son (simulation)
-    if (isCorrect) {
-      console.log('🎉 DING! Son de succès !');
-    } else {
-      console.log('💥 BONK! Son d\'assommage !');
-    }
+    // Jouer le bruit sourd
+    playHitSound();
     
-    // Mettre à jour les animations - SEULE la taupe frappée est assommée
-    const newAnimations: Array<'none' | 'correct' | 'incorrect' | 'knocked'> = ['none', 'none', 'none', 'none'];
-    newAnimations[moleIndex] = 'knocked'; // Seule la taupe cliquée est assommée
+    // Les autres taupes se cachent immédiatement
+    setMolesVisible(false);
     
+    // Seule la taupe cliquée reste visible avec l'animation appropriée
+    const newAnimations: Array<'none' | 'correct' | 'incorrect'> = ['none', 'none', 'none', 'none'];
+    newAnimations[moleIndex] = isCorrect ? 'correct' : 'incorrect';
     setMoleAnimations([...newAnimations]);
     
-    // Puis on indique la bonne réponse après un court délai
+    // Rendre visible seulement la taupe cliquée
     setTimeout(() => {
-      newAnimations[moleIndex] = isCorrect ? 'correct' : 'incorrect';
-      setMoleAnimations([...newAnimations]);
-    }, 600);
+      // On garde seulement la taupe sélectionnée visible temporairement
+      if (currentQuestion) {
+        // Créer un état spécial pour montrer seulement la taupe sélectionnée
+        setMolesVisible(true);
+      }
+    }, 100);
     
     // Mettre à jour le score
     const scoreChange = isCorrect ? 3 : -1;
@@ -654,7 +726,7 @@ export const FractionGame: React.FC = () => {
     // Passer à la question suivante après un délai
     setTimeout(() => {
       nextQuestion();
-    }, 2200);
+    }, 2500);
   };
 
   // Passer à la question suivante
@@ -889,7 +961,7 @@ export const FractionGame: React.FC = () => {
             fraction={fraction}
             isCorrect={fractionsEqual(fraction, currentQuestion.correctAnswer)}
             onClick={() => handleMoleClick(index)}
-            isVisible={molesVisible}
+            isVisible={questionAnswered ? index === selectedMole : molesVisible}
             animationState={moleAnimations[index]}
             timeLeft={stats.timeLeft}
           />
@@ -899,28 +971,14 @@ export const FractionGame: React.FC = () => {
       {/* Styles CSS pour les animations */}
       <style>
         {`
-          @keyframes correctMoleAnimation {
-            0% { transform: translateY(-15px) scale(1); }
-            50% { transform: translateY(-30px) scale(1.3); background-color: #4CAF50; }
-            100% { transform: translateY(-15px) scale(1); }
-          }
-          
-          @keyframes incorrectMoleAnimation {
-            0% { transform: translateY(-15px) scale(1) rotate(0deg); }
-            25% { transform: translateY(-15px) scale(1.1) rotate(-10deg); background-color: #F44336; }
-            75% { transform: translateY(-15px) scale(1.1) rotate(10deg); background-color: #F44336; }
-            100% { transform: translateY(-15px) scale(1) rotate(0deg); }
-          }
-          
-          @keyframes knockedAnimation {
-            0% { transform: translateY(-15px) rotate(0deg); }
-            50% { transform: translateY(40px) rotate(25deg) scale(0.8); }
-            100% { transform: translateY(50px) rotate(25deg) scale(0.8); }
-          }
-          
           @keyframes sparkle {
             0%, 100% { opacity: 0; transform: scale(0.5); }
             50% { opacity: 1; transform: scale(1.2); }
+          }
+          
+          @keyframes mockingAnimation {
+            0%, 100% { transform: rotate(-5deg) scale(1); }
+            50% { transform: rotate(5deg) scale(1.1); }
           }
           
           @keyframes pulse {
