@@ -13,10 +13,11 @@ interface Question {
   correctAnswer: Fraction;
   options: Fraction[];
   questionText: string;
+  molePositions: Array<{ top: string; left: string }>; // Positions aléatoires des taupes
 }
 
 interface MoleProps {
-  position: number;
+  position: { top: string; left: string };
   fraction: Fraction;
   isCorrect: boolean;
   onClick: () => void;
@@ -65,19 +66,39 @@ const fractionsEqual = (f1: Fraction, f2: Fraction): boolean => {
   return s1.numerator === s2.numerator && s1.denominator === s2.denominator;
 };
 
+// Générer des positions aléatoires pour les taupes
+const generateRandomPositions = (): Array<{ top: string; left: string }> => {
+  const positions: Array<{ top: string; left: string }> = [];
+  const minDistance = 150; // Distance minimale entre les taupes en pixels
+  
+  for (let i = 0; i < 4; i++) {
+    let attempts = 0;
+    let newPosition: { top: string; left: string };
+    
+    do {
+      // Générer une position aléatoire avec des marges
+      const top = Math.random() * 60 + 15; // Entre 15% et 75%
+      const left = Math.random() * 60 + 15; // Entre 15% et 75%
+      newPosition = { top: `${top}%`, left: `${left}%` };
+      attempts++;
+    } while (
+      attempts < 50 && 
+      positions.some(pos => {
+        const topDiff = Math.abs(parseFloat(pos.top) - parseFloat(newPosition.top));
+        const leftDiff = Math.abs(parseFloat(pos.left) - parseFloat(newPosition.left));
+        return topDiff < 20 || leftDiff < 20; // Éviter les positions trop proches
+      })
+    );
+    
+    positions.push(newPosition);
+  }
+  
+  return positions;
+};
+
 // Composant Taupe améliorée
 const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isVisible, animationState }) => {
   const moleRef = useRef<HTMLDivElement>(null);
-
-  const getHolePosition = (pos: number) => {
-    const positions = [
-      { top: '15%', left: '20%' },
-      { top: '15%', right: '20%' },
-      { top: '50%', left: '15%' },
-      { top: '50%', right: '15%' },
-    ];
-    return positions[pos] || positions[0];
-  };
 
   const getMoleColor = () => {
     if (animationState === 'correct') return '#4CAF50';
@@ -89,30 +110,45 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
     <div
       style={{
         position: 'absolute',
-        ...getHolePosition(position),
+        top: position.top,
+        left: position.left,
         transform: 'translate(-50%, -50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: isVisible ? 10 : 1,
-        transition: 'all 0.3s ease-in-out',
+        transition: 'all 0.4s ease-in-out',
         opacity: isVisible ? 1 : 0,
-        animation: animationState !== 'none' ? `${animationState}Animation 0.5s ease-in-out` : undefined
+        animation: animationState !== 'none' ? `${animationState}Animation 0.6s ease-in-out` : undefined
       }}
     >
-      {/* Trou circulaire */}
+      {/* Trou dans le sol - circulaire et sombre */}
       <div
         style={{
-          width: '120px',
-          height: '80px',
-          backgroundColor: '#2d1810',
+          width: '140px',
+          height: '90px',
+          backgroundColor: '#1a1a1a',
           borderRadius: '50%',
-          border: '4px solid #1a0e08',
           position: 'absolute',
-          bottom: '0',
+          bottom: '-20px',
           zIndex: 1,
-          boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.8)'
+          boxShadow: 'inset 0 8px 20px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.5)',
+          border: '3px solid #0d0d0d'
+        }}
+      />
+      
+      {/* Ombre du trou pour plus de profondeur */}
+      <div
+        style={{
+          width: '160px',
+          height: '30px',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          borderRadius: '50%',
+          position: 'absolute',
+          bottom: '-10px',
+          zIndex: 0,
+          filter: 'blur(8px)'
         }}
       />
       
@@ -121,76 +157,173 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         ref={moleRef}
         onClick={onClick}
         style={{
-          width: '80px',
-          height: '80px',
+          width: '85px',
+          height: '85px',
           backgroundColor: getMoleColor(),
           borderRadius: '50% 50% 45% 45%',
           border: '3px solid #5d2e00',
-          cursor: 'none', // On va utiliser un curseur personnalisé global
+          cursor: 'none',
           position: 'relative',
           zIndex: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'all 0.2s ease',
-          boxShadow: '0 6px 12px rgba(0,0,0,0.4)',
-          transform: isVisible ? 'translateY(-10px)' : 'translateY(30px)',
-          background: `linear-gradient(145deg, ${getMoleColor()}, #654321)`
+          transition: 'all 0.3s ease',
+          boxShadow: '0 8px 15px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.2)',
+          transform: isVisible ? 'translateY(-15px)' : 'translateY(40px)',
+          background: `radial-gradient(circle at 30% 30%, ${getMoleColor()}, #654321)`
         }}
       >
         {/* Oreilles de la taupe */}
-        <div style={{ position: 'absolute', top: '8px', left: '15px', width: '12px', height: '20px', backgroundColor: '#5d2e00', borderRadius: '50%', transform: 'rotate(-20deg)' }} />
-        <div style={{ position: 'absolute', top: '8px', right: '15px', width: '12px', height: '20px', backgroundColor: '#5d2e00', borderRadius: '50%', transform: 'rotate(20deg)' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '5px', 
+          left: '12px', 
+          width: '14px', 
+          height: '22px', 
+          backgroundColor: '#5d2e00', 
+          borderRadius: '50%', 
+          transform: 'rotate(-25deg)',
+          boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.3)'
+        }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '5px', 
+          right: '12px', 
+          width: '14px', 
+          height: '22px', 
+          backgroundColor: '#5d2e00', 
+          borderRadius: '50%', 
+          transform: 'rotate(25deg)',
+          boxShadow: 'inset 2px 2px 4px rgba(0,0,0,0.3)'
+        }} />
+        
+        {/* Intérieur des oreilles */}
+        <div style={{ 
+          position: 'absolute', 
+          top: '10px', 
+          left: '16px', 
+          width: '6px', 
+          height: '10px', 
+          backgroundColor: '#FF69B4', 
+          borderRadius: '50%', 
+          transform: 'rotate(-25deg)'
+        }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '10px', 
+          right: '16px', 
+          width: '6px', 
+          height: '10px', 
+          backgroundColor: '#FF69B4', 
+          borderRadius: '50%', 
+          transform: 'rotate(25deg)'
+        }} />
         
         {/* Yeux de la taupe */}
-        <div style={{ position: 'absolute', top: '25px', left: '22px', width: '8px', height: '8px', backgroundColor: 'black', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', top: '25px', right: '22px', width: '8px', height: '8px', backgroundColor: 'black', borderRadius: '50%' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '28px', 
+          left: '20px', 
+          width: '10px', 
+          height: '10px', 
+          backgroundColor: 'black', 
+          borderRadius: '50%',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.5)'
+        }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '28px', 
+          right: '20px', 
+          width: '10px', 
+          height: '10px', 
+          backgroundColor: 'black', 
+          borderRadius: '50%',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.5)'
+        }} />
         
         {/* Reflets dans les yeux */}
-        <div style={{ position: 'absolute', top: '26px', left: '24px', width: '3px', height: '3px', backgroundColor: 'white', borderRadius: '50%' }} />
-        <div style={{ position: 'absolute', top: '26px', right: '24px', width: '3px', height: '3px', backgroundColor: 'white', borderRadius: '50%' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '29px', 
+          left: '22px', 
+          width: '4px', 
+          height: '4px', 
+          backgroundColor: 'white', 
+          borderRadius: '50%'
+        }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '29px', 
+          right: '22px', 
+          width: '4px', 
+          height: '4px', 
+          backgroundColor: 'white', 
+          borderRadius: '50%'
+        }} />
         
         {/* Nez de la taupe */}
-        <div style={{ position: 'absolute', top: '38px', left: '50%', transform: 'translateX(-50%)', width: '6px', height: '6px', backgroundColor: '#FF69B4', borderRadius: '50%' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '42px', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          width: '8px', 
+          height: '6px', 
+          backgroundColor: '#FF1493', 
+          borderRadius: '50%',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+        }} />
         
         {/* Bouche */}
-        <div style={{ position: 'absolute', top: '48px', left: '50%', transform: 'translateX(-50%)', width: '2px', height: '8px', backgroundColor: 'black', borderRadius: '2px' }} />
+        <div style={{ 
+          position: 'absolute', 
+          top: '52px', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          width: '3px', 
+          height: '10px', 
+          backgroundColor: 'black', 
+          borderRadius: '2px'
+        }} />
         
         {/* Moustaches */}
-        <div style={{ position: 'absolute', top: '40px', left: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '44px', left: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '40px', right: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '44px', right: '8px', width: '15px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '44px', left: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '48px', left: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '44px', right: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '48px', right: '5px', width: '18px', height: '1px', backgroundColor: 'black' }} />
       </div>
       
-      {/* Panneau avec la réponse amélioré */}
+      {/* Panneau avec la réponse */}
       <div
         style={{
           backgroundColor: '#FFF8DC',
           color: '#8B4513',
-          padding: '10px 15px',
+          padding: '12px 18px',
           borderRadius: '12px',
           border: '3px solid #8B4513',
-          fontSize: '18px',
+          fontSize: '20px',
           fontWeight: 'bold',
-          marginTop: '15px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+          marginTop: '20px',
+          boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
           zIndex: 3,
-          minWidth: '60px',
+          minWidth: '70px',
           textAlign: 'center',
           position: 'relative',
-          transform: 'rotate(-2deg)'
+          transform: 'rotate(-1deg)',
+          background: 'linear-gradient(145deg, #FFF8DC, #F5DEB3)'
         }}
       >
         {/* Poteau du panneau */}
         <div style={{
           position: 'absolute',
-          bottom: '-10px',
+          bottom: '-15px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '4px',
-          height: '15px',
-          backgroundColor: '#8B4513'
+          width: '6px',
+          height: '20px',
+          backgroundColor: '#8B4513',
+          borderRadius: '3px'
         }} />
         {fractionToString(fraction)}
       </div>
@@ -222,7 +355,8 @@ const HammerCursor: React.FC<{ mousePosition: { x: number; y: number } }> = ({ m
         width: '6px',
         height: '30px',
         backgroundColor: '#8B4513',
-        borderRadius: '3px'
+        borderRadius: '3px',
+        background: 'linear-gradient(90deg, #654321, #8B4513, #654321)'
       }} />
       
       {/* Tête du marteau */}
@@ -235,7 +369,8 @@ const HammerCursor: React.FC<{ mousePosition: { x: number; y: number } }> = ({ m
         height: '12px',
         backgroundColor: '#696969',
         borderRadius: '2px',
-        border: '1px solid #2F4F4F'
+        border: '1px solid #2F4F4F',
+        background: 'linear-gradient(145deg, #808080, #696969, #2F4F4F)'
       }} />
       
       {/* Reflet métallique */}
@@ -280,6 +415,9 @@ export const FractionGame: React.FC = () => {
     const denominators = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
     const numerators = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     
+    // Générer des positions aléatoires pour les taupes
+    const molePositions = generateRandomPositions();
+    
     if (questionType < 0.33) {
       // Addition
       const fraction1: Fraction = {
@@ -302,7 +440,8 @@ export const FractionGame: React.FC = () => {
         operation: '+',
         correctAnswer,
         options,
-        questionText: `${fractionToString(fraction1)} + ${fractionToString(fraction2)} = ?`
+        questionText: `${fractionToString(fraction1)} + ${fractionToString(fraction2)} = ?`,
+        molePositions
       };
     } else if (questionType < 0.66) {
       // Soustraction
@@ -326,7 +465,8 @@ export const FractionGame: React.FC = () => {
         operation: '-',
         correctAnswer,
         options,
-        questionText: `${fractionToString(fraction1)} - ${fractionToString(fraction2)} = ?`
+        questionText: `${fractionToString(fraction1)} - ${fractionToString(fraction2)} = ?`,
+        molePositions
       };
     } else {
       // Simplification
@@ -350,7 +490,8 @@ export const FractionGame: React.FC = () => {
         operation: 'simplify',
         correctAnswer,
         options,
-        questionText: `Simplifie : ${fractionToString(unsimplifiedFraction)} = ?`
+        questionText: `Simplifie : ${fractionToString(unsimplifiedFraction)} = ?`,
+        molePositions
       };
     }
   };
@@ -405,7 +546,7 @@ export const FractionGame: React.FC = () => {
     // Afficher les taupes après un petit délai
     setTimeout(() => {
       setMolesVisible(true);
-    }, 500);
+    }, 800);
   };
 
   // Gérer la sélection d'une taupe
@@ -440,7 +581,7 @@ export const FractionGame: React.FC = () => {
     // Passer à la question suivante après un délai
     setTimeout(() => {
       nextQuestion();
-    }, 1500);
+    }, 1800);
   };
 
   // Passer à la question suivante
@@ -467,7 +608,7 @@ export const FractionGame: React.FC = () => {
       setMolesVisible(false);
       setTimeout(() => {
         initializeQuestion();
-      }, 500);
+      }, 600);
     }
   };
 
@@ -631,24 +772,39 @@ export const FractionGame: React.FC = () => {
         </h2>
       </div>
 
-      {/* Zone de jeu avec trous circulaires */}
+      {/* Zone de jeu - Pelouse verte avec trous */}
       <div style={{
         flex: 1,
         position: 'relative',
-        background: 'linear-gradient(45deg, #8FBC8F 25%, #90EE90 25%, #90EE90 50%, #8FBC8F 50%, #8FBC8F 75%, #90EE90 75%)',
-        backgroundSize: '40px 40px',
+        background: 'radial-gradient(circle at 50% 50%, #90EE90, #228B22)',
         borderRadius: '20px',
-        border: '4px solid #228B22',
+        border: '4px solid #006400',
         maxWidth: '800px',
         margin: '0 auto',
         width: '100%',
-        boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
+        boxShadow: '0 8px 16px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.1)',
+        overflow: 'hidden'
       }}>
-        {/* Taupes dans leurs trous */}
+        {/* Texture d'herbe subtile */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `
+            radial-gradient(circle at 20% 20%, rgba(0,100,0,0.1) 1px, transparent 1px),
+            radial-gradient(circle at 80% 80%, rgba(0,100,0,0.1) 1px, transparent 1px),
+            radial-gradient(circle at 60% 40%, rgba(0,100,0,0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '30px 30px, 25px 25px, 35px 35px'
+        }} />
+        
+        {/* Taupes dans leurs trous aléatoires */}
         {currentQuestion.options.slice(0, 4).map((fraction, index) => (
           <Mole
-            key={index}
-            position={index}
+            key={`${stats.currentQuestion}-${index}`}
+            position={currentQuestion.molePositions[index]}
             fraction={fraction}
             isCorrect={fractionsEqual(fraction, currentQuestion.correctAnswer)}
             onClick={() => handleMoleClick(index)}
@@ -662,16 +818,18 @@ export const FractionGame: React.FC = () => {
       <style>
         {`
           @keyframes correctAnimation {
-            0% { transform: scale(1) translateY(-10px); }
-            50% { transform: scale(1.3) translateY(-20px); }
-            100% { transform: scale(1) translateY(-10px); }
+            0% { transform: scale(1) translateY(-15px); }
+            50% { transform: scale(1.4) translateY(-25px) rotate(5deg); }
+            100% { transform: scale(1) translateY(-15px); }
           }
           
           @keyframes incorrectAnimation {
-            0% { transform: scale(1) translateY(-10px) rotate(0deg); }
-            25% { transform: scale(1.1) translateY(-10px) rotate(-10deg); }
-            75% { transform: scale(1.1) translateY(-10px) rotate(10deg); }
-            100% { transform: scale(1) translateY(-10px) rotate(0deg); }
+            0% { transform: scale(1) translateY(-15px) rotate(0deg); }
+            20% { transform: scale(1.2) translateY(-15px) rotate(-15deg); }
+            40% { transform: scale(1.2) translateY(-15px) rotate(15deg); }
+            60% { transform: scale(1.2) translateY(-15px) rotate(-10deg); }
+            80% { transform: scale(1.2) translateY(-15px) rotate(10deg); }
+            100% { transform: scale(1) translateY(-15px) rotate(0deg); }
           }
           
           @keyframes pulse {
