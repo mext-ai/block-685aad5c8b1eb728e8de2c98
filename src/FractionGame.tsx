@@ -13,11 +13,11 @@ interface Question {
   correctAnswer: Fraction;
   options: Fraction[];
   questionText: string;
-  molePositions: Array<{ top: string; left: string }>; // Positions aléatoires des taupes
+  selectedHoles: number[]; // Indices des 4 trous sélectionnés (0-8)
 }
 
 interface MoleProps {
-  position: { top: string; left: string };
+  holeIndex: number;
   fraction: Fraction;
   isCorrect: boolean;
   onClick: () => void;
@@ -100,53 +100,85 @@ const playHitSound = () => {
   }
 };
 
-// Améliorer encore plus la génération de positions pour éviter les superpositions
-const generateRandomPositions = (): Array<{ top: string; left: string }> => {
-  const positions: Array<{ top: string; left: string }> = [];
-  const minDistancePercent = 35; // Augmenté à 35% pour plus d'espacement
+// Sélectionner 4 trous aléatoires parmi les 9 disponibles
+const selectRandomHoles = (): number[] => {
+  const allHoles = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const selectedHoles: number[] = [];
   
-  for (let i = 0; i < 4; i++) {
-    let attempts = 0;
-    let newPosition: { top: string; left: string };
-    let isValid = false;
+  // Sélectionner 4 trous différents
+  while (selectedHoles.length < 4) {
+    const randomIndex = Math.floor(Math.random() * allHoles.length);
+    const holeIndex = allHoles[randomIndex];
     
-    do {
-      // Générer une position aléatoire avec des marges encore plus importantes
-      const top = Math.random() * 40 + 25; // Entre 25% et 65% (zone plus restreinte)
-      const left = Math.random() * 40 + 25; // Entre 25% et 65%
-      newPosition = { top: `${top}%`, left: `${left}%` };
-      
-      // Vérifier la distance avec toutes les positions existantes
-      isValid = positions.every(pos => {
-        const topDiff = Math.abs(parseFloat(pos.top) - parseFloat(newPosition.top));
-        const leftDiff = Math.abs(parseFloat(pos.left) - parseFloat(newPosition.left));
-        // Les deux distances doivent être suffisantes
-        return topDiff >= minDistancePercent && leftDiff >= minDistancePercent;
-      });
-      
-      attempts++;
-    } while (!isValid && attempts < 150); // Plus de tentatives
-    
-    // Si on n'arrive pas à trouver une position valide, utiliser des positions prédéfinies bien espacées
-    if (!isValid) {
-      const fallbackPositions = [
-        { top: '30%', left: '30%' },
-        { top: '30%', left: '70%' },
-        { top: '70%', left: '30%' },
-        { top: '70%', left: '70%' }
-      ];
-      newPosition = fallbackPositions[i] || fallbackPositions[0];
+    if (!selectedHoles.includes(holeIndex)) {
+      selectedHoles.push(holeIndex);
     }
-    
-    positions.push(newPosition);
   }
   
-  return positions;
+  return selectedHoles.sort((a, b) => a - b); // Trier pour cohérence
 };
 
-// Composant Taupe améliorée avec trou fixe
-const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isVisible, animationState, timeLeft }) => {
+// Obtenir la position d'un trou dans la grille 3x3
+const getHolePosition = (holeIndex: number): { top: string; left: string } => {
+  const row = Math.floor(holeIndex / 3); // 0, 1, ou 2
+  const col = holeIndex % 3; // 0, 1, ou 2
+  
+  // Centrer chaque trou dans sa sous-zone
+  const top = `${(row * 33.33) + 16.67}%`; // 16.67%, 50%, 83.33%
+  const left = `${(col * 33.33) + 16.67}%`; // 16.67%, 50%, 83.33%
+  
+  return { top, left };
+};
+
+// Composant Trou fixe
+const Hole: React.FC<{ holeIndex: number }> = ({ holeIndex }) => {
+  const position = getHolePosition(holeIndex);
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: position.top,
+        left: position.left,
+        transform: 'translate(-50%, -50%)',
+        zIndex: 1
+      }}
+    >
+      {/* Trou dans le sol - FIXE */}
+      <div
+        style={{
+          width: '120px',
+          height: '80px',
+          backgroundColor: '#0d0d0d',
+          borderRadius: '50%',
+          boxShadow: 'inset 0 8px 20px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6)',
+          border: '3px solid #000000'
+        }}
+      />
+      
+      {/* Ombre du trou pour plus de profondeur - FIXE */}
+      <div
+        style={{
+          width: '140px',
+          height: '25px',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          borderRadius: '50%',
+          position: 'absolute',
+          top: '10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          filter: 'blur(8px)',
+          zIndex: -1
+        }}
+      />
+    </div>
+  );
+};
+
+// Composant Taupe dans un trou spécifique
+const Mole: React.FC<MoleProps> = ({ holeIndex, fraction, isCorrect, onClick, isVisible, animationState, timeLeft }) => {
   const moleRef = useRef<HTMLDivElement>(null);
+  const position = getHolePosition(holeIndex);
 
   const getMoleColor = () => {
     if (animationState === 'correct') return '#4CAF50'; // Vert pour succès
@@ -186,42 +218,13 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         zIndex: 5
       }}
     >
-      {/* Trou dans le sol - FIXE, ne bouge jamais */}
-      <div
-        style={{
-          width: '160px',
-          height: '100px',
-          backgroundColor: '#0d0d0d',
-          borderRadius: '50%',
-          position: 'absolute',
-          bottom: '-30px',
-          zIndex: 1,
-          boxShadow: 'inset 0 12px 25px rgba(0,0,0,0.95), 0 0 15px rgba(0,0,0,0.6)',
-          border: '4px solid #000000'
-        }}
-      />
-      
-      {/* Ombre du trou pour plus de profondeur - FIXE */}
-      <div
-        style={{
-          width: '180px',
-          height: '35px',
-          backgroundColor: 'rgba(0,0,0,0.4)',
-          borderRadius: '50%',
-          position: 'absolute',
-          bottom: '-15px',
-          zIndex: 0,
-          filter: 'blur(10px)'
-        }}
-      />
-      
       {/* Taupe - SEULE À BOUGER */}
       <div
         ref={moleRef}
         onClick={onClick}
         style={{
-          width: '90px',
-          height: '90px',
+          width: '80px',
+          height: '80px',
           backgroundColor: getMoleColor(),
           borderRadius: '50% 50% 45% 45%',
           border: '3px solid #5d2e00',
@@ -241,9 +244,9 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ 
           position: 'absolute', 
           top: '5px', 
-          left: '15px', 
-          width: '16px', 
-          height: '24px', 
+          left: '12px', 
+          width: '14px', 
+          height: '20px', 
           backgroundColor: '#5d2e00', 
           borderRadius: '50%', 
           transform: 'rotate(-25deg)',
@@ -252,9 +255,9 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         <div style={{ 
           position: 'absolute', 
           top: '5px', 
-          right: '15px', 
-          width: '16px', 
-          height: '24px', 
+          right: '12px', 
+          width: '14px', 
+          height: '20px', 
           backgroundColor: '#5d2e00', 
           borderRadius: '50%', 
           transform: 'rotate(25deg)',
@@ -264,20 +267,20 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         {/* Intérieur des oreilles */}
         <div style={{ 
           position: 'absolute', 
-          top: '10px', 
-          left: '19px', 
-          width: '8px', 
-          height: '12px', 
+          top: '8px', 
+          left: '15px', 
+          width: '6px', 
+          height: '8px', 
           backgroundColor: '#FF69B4', 
           borderRadius: '50%', 
           transform: 'rotate(-25deg)'
         }} />
         <div style={{ 
           position: 'absolute', 
-          top: '10px', 
-          right: '19px', 
-          width: '8px', 
-          height: '12px', 
+          top: '8px', 
+          right: '15px', 
+          width: '6px', 
+          height: '8px', 
           backgroundColor: '#FF69B4', 
           borderRadius: '50%', 
           transform: 'rotate(25deg)'
@@ -286,10 +289,10 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         {/* Yeux de la taupe - changeant selon l'état */}
         <div style={{ 
           position: 'absolute', 
-          top: '30px', 
-          left: '22px', 
-          width: '12px', 
-          height: animationState === 'correct' ? '4px' : '12px', // Yeux fermés si assommée (correct)
+          top: '25px', 
+          left: '20px', 
+          width: '10px', 
+          height: animationState === 'correct' ? '3px' : '10px', // Yeux fermés si assommée (correct)
           backgroundColor: 'black', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
@@ -298,10 +301,10 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         }} />
         <div style={{ 
           position: 'absolute', 
-          top: '30px', 
-          right: '22px', 
-          width: '12px', 
-          height: animationState === 'correct' ? '4px' : '12px',
+          top: '25px', 
+          right: '20px', 
+          width: '10px', 
+          height: animationState === 'correct' ? '3px' : '10px',
           backgroundColor: 'black', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
@@ -314,19 +317,19 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           <>
             <div style={{ 
               position: 'absolute', 
-              top: '32px', 
-              left: '25px', 
-              width: '4px', 
-              height: '4px', 
+              top: '27px', 
+              left: '22px', 
+              width: '3px', 
+              height: '3px', 
               backgroundColor: 'white', 
               borderRadius: '50%'
             }} />
             <div style={{ 
               position: 'absolute', 
-              top: '32px', 
-              right: '25px', 
-              width: '4px', 
-              height: '4px', 
+              top: '27px', 
+              right: '22px', 
+              width: '3px', 
+              height: '3px', 
               backgroundColor: 'white', 
               borderRadius: '50%'
             }} />
@@ -336,11 +339,11 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         {/* Nez de la taupe */}
         <div style={{ 
           position: 'absolute', 
-          top: '45px', 
+          top: '38px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
-          width: '10px', 
-          height: '8px', 
+          width: '8px', 
+          height: '6px', 
           backgroundColor: '#FF1493', 
           borderRadius: '50%',
           boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
@@ -349,60 +352,60 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         {/* Bouche - change selon l'état */}
         <div style={{ 
           position: 'absolute', 
-          top: '55px', 
+          top: '48px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
-          width: animationState === 'incorrect' ? '20px' : '4px', // Bouche large si moqueuse
-          height: animationState === 'correct' ? '15px' : '12px', // Bouche ouverte si assommée
+          width: animationState === 'incorrect' ? '16px' : '3px', // Bouche large si moqueuse
+          height: animationState === 'correct' ? '12px' : '8px', // Bouche ouverte si assommée
           backgroundColor: 'black', 
           borderRadius: animationState === 'correct' ? '50%' : 
-                        animationState === 'incorrect' ? '10px' : '2px', // Sourire moqueur
-          border: animationState === 'incorrect' ? '2px solid black' : 'none'
+                        animationState === 'incorrect' ? '8px' : '2px', // Sourire moqueur
+          border: animationState === 'incorrect' ? '1px solid black' : 'none'
         }} />
         
         {/* Langue moqueuse si incorrect */}
         {animationState === 'incorrect' && (
           <div style={{
             position: 'absolute',
-            top: '58px',
+            top: '50px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '6px',
-            height: '8px',
+            width: '4px',
+            height: '6px',
             backgroundColor: '#FF69B4',
             borderRadius: '50%'
           }} />
         )}
         
         {/* Moustaches */}
-        <div style={{ position: 'absolute', top: '47px', left: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '51px', left: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '47px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
-        <div style={{ position: 'absolute', top: '51px', right: '8px', width: '20px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '40px', left: '6px', width: '16px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '43px', left: '6px', width: '16px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '40px', right: '6px', width: '16px', height: '1px', backgroundColor: 'black' }} />
+        <div style={{ position: 'absolute', top: '43px', right: '6px', width: '16px', height: '1px', backgroundColor: 'black' }} />
         
         {/* Étoiles d'assommage pour succès */}
         {animationState === 'correct' && (
           <>
             <div style={{ 
               position: 'absolute', 
-              top: '-10px', 
-              left: '10px', 
-              fontSize: '20px',
+              top: '-8px', 
+              left: '8px', 
+              fontSize: '16px',
               animation: 'sparkle 1s infinite'
             }}>⭐</div>
             <div style={{ 
               position: 'absolute', 
-              top: '-15px', 
-              right: '15px', 
-              fontSize: '16px',
+              top: '-12px', 
+              right: '12px', 
+              fontSize: '14px',
               animation: 'sparkle 1s infinite 0.3s'
             }}>✨</div>
             <div style={{ 
               position: 'absolute', 
-              top: '-5px', 
+              top: '-4px', 
               left: '50%',
               transform: 'translateX(-50%)',
-              fontSize: '18px',
+              fontSize: '15px',
               animation: 'sparkle 1s infinite 0.6s'
             }}>💫</div>
           </>
@@ -413,16 +416,16 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
           <>
             <div style={{ 
               position: 'absolute', 
-              top: '-15px', 
-              left: '10px', 
-              fontSize: '18px',
+              top: '-12px', 
+              left: '8px', 
+              fontSize: '14px',
               animation: 'mockingAnimation 0.5s infinite'
             }}>😝</div>
             <div style={{ 
               position: 'absolute', 
-              top: '-10px', 
-              right: '10px', 
-              fontSize: '16px',
+              top: '-8px', 
+              right: '8px', 
+              fontSize: '12px',
               animation: 'mockingAnimation 0.5s infinite 0.2s'
             }}>😜</div>
           </>
@@ -434,15 +437,15 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         style={{
           backgroundColor: '#FFF8DC',
           color: '#8B4513',
-          padding: '14px 20px',
-          borderRadius: '12px',
-          border: '3px solid #8B4513',
-          fontSize: '22px',
+          padding: '10px 14px',
+          borderRadius: '10px',
+          border: '2px solid #8B4513',
+          fontSize: '18px',
           fontWeight: 'bold',
-          marginTop: '25px',
-          boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
+          marginTop: '20px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
           zIndex: 4,
-          minWidth: '80px',
+          minWidth: '60px',
           textAlign: 'center',
           position: 'relative',
           transform: `rotate(-1deg) ${getMoleTransform()}`, // Suit le mouvement de la taupe
@@ -454,13 +457,13 @@ const Mole: React.FC<MoleProps> = ({ position, fraction, isCorrect, onClick, isV
         {/* Poteau du panneau */}
         <div style={{
           position: 'absolute',
-          bottom: '-18px',
+          bottom: '-12px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '8px',
-          height: '25px',
+          width: '6px',
+          height: '18px',
           backgroundColor: '#8B4513',
-          borderRadius: '4px'
+          borderRadius: '3px'
         }} />
         {fractionToString(fraction)}
       </div>
@@ -552,8 +555,8 @@ export const FractionGame: React.FC = () => {
     const denominators = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
     const numerators = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     
-    // Générer des positions aléatoires pour les taupes
-    const molePositions = generateRandomPositions();
+    // Sélectionner 4 trous aléatoires parmi les 9
+    const selectedHoles = selectRandomHoles();
     
     if (questionType < 0.33) {
       // Addition
@@ -578,7 +581,7 @@ export const FractionGame: React.FC = () => {
         correctAnswer,
         options,
         questionText: `${fractionToString(fraction1)} + ${fractionToString(fraction2)} = ?`,
-        molePositions
+        selectedHoles
       };
     } else if (questionType < 0.66) {
       // Soustraction
@@ -603,7 +606,7 @@ export const FractionGame: React.FC = () => {
         correctAnswer,
         options,
         questionText: `${fractionToString(fraction1)} - ${fractionToString(fraction2)} = ?`,
-        molePositions
+        selectedHoles
       };
     } else {
       // Simplification
@@ -628,7 +631,7 @@ export const FractionGame: React.FC = () => {
         correctAnswer,
         options,
         questionText: `Simplifie : ${fractionToString(unsimplifiedFraction)} = ?`,
-        molePositions
+        selectedHoles
       };
     }
   };
@@ -709,9 +712,7 @@ export const FractionGame: React.FC = () => {
     
     // Rendre visible seulement la taupe cliquée
     setTimeout(() => {
-      // On garde seulement la taupe sélectionnée visible temporairement
       if (currentQuestion) {
-        // Créer un état spécial pour montrer seulement la taupe sélectionnée
         setMolesVisible(true);
       }
     }, 100);
@@ -925,7 +926,7 @@ export const FractionGame: React.FC = () => {
         </h2>
       </div>
 
-      {/* Zone de jeu - Pelouse verte avec trous */}
+      {/* Zone de jeu - Pelouse verte avec grille 3x3 de trous */}
       <div style={{
         flex: 1,
         position: 'relative',
@@ -953,16 +954,21 @@ export const FractionGame: React.FC = () => {
           backgroundSize: '30px 30px, 25px 25px, 35px 35px'
         }} />
         
-        {/* Taupes dans leurs trous aléatoires */}
-        {currentQuestion.options.slice(0, 4).map((fraction, index) => (
+        {/* Grille 3x3 de trous - TOUJOURS VISIBLES */}
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(holeIndex => (
+          <Hole key={holeIndex} holeIndex={holeIndex} />
+        ))}
+        
+        {/* Taupes dans les trous sélectionnés */}
+        {currentQuestion.options.slice(0, 4).map((fraction, moleIndex) => (
           <Mole
-            key={`${stats.currentQuestion}-${index}`}
-            position={currentQuestion.molePositions[index]}
+            key={`${stats.currentQuestion}-${moleIndex}`}
+            holeIndex={currentQuestion.selectedHoles[moleIndex]}
             fraction={fraction}
             isCorrect={fractionsEqual(fraction, currentQuestion.correctAnswer)}
-            onClick={() => handleMoleClick(index)}
-            isVisible={questionAnswered ? index === selectedMole : molesVisible}
-            animationState={moleAnimations[index]}
+            onClick={() => handleMoleClick(moleIndex)}
+            isVisible={questionAnswered ? moleIndex === selectedMole : molesVisible}
+            animationState={moleAnimations[moleIndex]}
             timeLeft={stats.timeLeft}
           />
         ))}
